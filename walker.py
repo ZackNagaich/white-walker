@@ -5,15 +5,17 @@ import requests
 
 class WhiteWalker():
 
+
+	def __init__(self):
+		self.domains = {}
+
 	def _get_whitelist(self):
-		domains = {}
 		try:	
 			fp = open("domains.csv","r")
 			lines = fp.readlines()
 			for line in lines:
 				pair = line.rstrip().split(',')
-				domains[pair[1]] = pair[0]
-			return domains
+				self.domains[pair[1]] = pair[0]
 		except:
 			print("\nFailed to open domains.csv...fetching from github...\n")
 			r = requests.get("https://raw.githubusercontent.com/ZackNagaich/white-walker/master/domains.csv")
@@ -25,8 +27,7 @@ class WhiteWalker():
 			lines = data.split('\n')[:-1]
 			for line in lines:
 				pair = line.rstrip().split(',')
-				domains[pair[1]] = pair[0]
-			return domains
+				self.domains[pair[1]] = pair[0]
 			
 			
 
@@ -60,25 +61,30 @@ class WhiteWalker():
 			print("\nSomething went wrong...\n")
 
 	def check_whitelist_by_domain(self,domain):
-		domain = self._get_tld(domain)	
-		domains = self._get_whitelist()
 
-		if domain  in domains:
-			print("\nWhitelist Membership Confirmed!\n%s is ranked %s" % (domain,domains[domain]))
+		domain = self._get_tld(domain)	
+		
+		if len(self.domains) == 0:
+			self._get_whitelist()
+
+		if domain  in self.domains:
+			print("\nWhitelist Membership Confirmed!\n%s is ranked %s" % (domain,self.domains[domain]))
 			return True
 		else:
 			print("\nCould not find %s in whitelist...\n" % (domain))
 			return False
 
-	def check_whitelist_by_ip(self,ip):
-		domains = self._get_whitelist()
+	def check_whitelist_by_ip(self,ip):	
+		if len(self.domains) ==  0:
+			self._get_whitelist()
+
 		host = self._get_host_by_addr(ip)
 
 		if host is not None:
 			host = self._get_tld(host)
 
-			if host in domains:
-				print("\nWhitelist Membership Confirmed!\n%s is ranked %s" % (host,domains[host]))
+			if host in self.domains:
+				print("\nWhitelist Membership Confirmed!\n%s is ranked %s" % (host,self.domains[host]))
 				return True
 			else:
 				print("\nCould not find %s in whitelist...\n" % (host))	
