@@ -10,7 +10,7 @@ if not found it will obtain the whitelist from this github repo.
 ```
 from white_walker import WhiteWalker
 
-w = WhiteWalker('api_key_goes_here')
+w = WhiteWalker('threatgrid_api_key_goes_here')
 
 w.check_whitelist_by_domain('github.com')
 w.check_whitelist_by_hash('hash_goes_here')
