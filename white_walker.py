@@ -12,32 +12,15 @@ class WhiteWalker():
 	def __init__(self,api_key):
 		self.domains = {}
 		self.api_key = api_key
-
-
-	def _search_samples(self,options):
-		'''Override search_samples in pythreatgrid (direct GET request seems a bit faster, as opposed to generator yields)
-		Args:
-			options (dict): Options for the API request.
-		Returns:
-			 json_resp (dict): JSON object for API return 
-		'''
-
-		_HOST = 'https://panacea.threatgrid.com'
-		'''str: Represents the host that the API will connect to.
-		'''
-		_APIROOT = '/api/v2'
-		'''str: The root URI for the API.
-		'''
-		_URL = _HOST + _APIROOT
-		'''str: Controls where requests will be sent.
-		'''
-		r = requests.get('%s/samples/search' % (_URL),
-		data=options)
-		json_resp = json.loads(r.text)
-
-		return json_resp 
+ 
 
 	def _get_whitelist(self):
+		''' Reads whitelist from domains.csv. If this fails, it fetches this list on GitHub.
+		Args:
+			None.
+		Updates:
+			Instance variable domains is set to a dictionary of ranking and domains from whitelist.
+		'''
 		try:	
 			fp = open("domains.csv","r")
 			lines = fp.readlines()
@@ -59,12 +42,19 @@ class WhiteWalker():
 			
 
 	def _get_tg_artifacts(self,checksum):
-		sample_list = set()
-		resp = self._search_samples({'api_key':self.api_key,'checksum':checksum})
-		if 'data' in resp:
-			for item in resp[u'data'][u'items']:
-				sample_list.add(item['sample'])
+		''' Searches ThreatGrid for sample ID's and strips out related URLs found in the analysis.
+		Args:
+			checksum - hash value to search threatgrid for.
+		Returns:
+			urls - A set of URLs obtained from ThreatGrid Sample Analysis	.
+		'''
 
+		sample_list = set()
+
+		for resp in search_samples({'api_key':self.api_key,'checksum':checksum}):
+			if 'data' in resp:
+				for item in resp[u'data'][u'items']:
+					sample_list.add(item['sample'])
 		
 		if len(sample_list) > 0:
 			urls = set()
@@ -80,7 +70,14 @@ class WhiteWalker():
 						urls.add(url)
 			return urls
 
+
 	def _get_tld(self,domain):
+		''' Trims down a domain to it's top level 
+		Args:
+			Domain to trim.
+		Returns:
+			domain - A TLD representation of the passed domain.
+		'''
 		dot_indexes = [x for x,y in enumerate(domain) if y == '.']
 		if len(dot_indexes) > 2:
 			domain = domain[dot_indexes[1]+1:]
@@ -91,6 +88,12 @@ class WhiteWalker():
 	
 
 	def _get_host_by_addr(self,ip):
+		''' Performs reverse DNS lookup for supplied IP.
+		Args:
+			ip - String representation of IPv4 address.
+		Returns:
+			host - host returned from reverse DNS lookup.
+		'''
 		try:
 			host = socket.gethostbyaddr(ip)[0]
 			return host
@@ -101,6 +104,12 @@ class WhiteWalker():
 			print("\nSomething went wrong...\n")
 	
 	def _get_ip_by_host(self,hostname):
+		''' Performs DNS lookup for supplied host name.
+		Args:
+			hostname - hostname to look up.
+		Returns:
+			ip - IPv4 address returned from DNS lookup .
+		'''
 		try:
 			ip = socket.gethostbyname(hostname)
 			return(ip)
@@ -111,7 +120,12 @@ class WhiteWalker():
 			print("\nSomething went wrong...\n")
 
 	def check_whitelist_by_domain(self,domain):
-
+		''' Checks whitelist for supplied domain.
+		Args:
+			domain - domain to check whitelist for. Should be TLD.
+		Returns:
+			Boolean - True if domain is in whitelist, False otherwise.
+		'''	
 		domain = self._get_tld(domain)	
 		
 		if len(self.domains) == 0:
@@ -125,25 +139,45 @@ class WhiteWalker():
 			return False
 
 	def check_whitelist_by_hash(self,checksum):
-	
+		''' Gets related domains from supplied checksum using ThreatGrid. Then checks membership for the returned domains against whitelist.
+		Args:
+			checksum - hash to search threatgrid for to obtain related domains. .
+		Returns:
+			Boolean - True if at least 1 domain was matched to whitelist
+			hit_domains - List of domains that matched against whitelist
+			percentage - Percentage of hit domains against total number of identified domains. 
+		'''	
 		if len(self.domains) == 0:
 			self._get_whitelist()
 
 		tg_domains = self._get_tg_artifacts(checksum)
 		size = len(tg_domains)
+		hit_domains = list()
 		count = 0
 		for domain in tg_domains:
 			if domain in self.domains:
+				hit_domains.append(domain)
 				count += 1
+
+		percentage = size/count
 				
 		if count > 0:
-			print("\nWhitelist Membership Confirmed for %s out of %s total identified domains\n" % (count,size))
-			return True
+			print("\nWhitelist Membership Confirmed for %s out of %s total identified domains (%s%%)\n" % (count,size,percentage))
+			for domain in hit_domains:
+				print(domain)
+			return (True,hit_domains,percentage)
 		else:
 			print("\nCould not find any domains related to the submitted hash\n")
-			return False
+			return (False,hit_domains,percentage)
 		
+
 	def check_whitelist_by_ip(self,ip):	
+		''' Checks whitelist for supplied ip.
+		Args:
+			ip - String representation of IPv4 address to perform DNS lookup with.
+		Returns:
+			Boolean - True if domain is in whitelist, False otherwise.
+		'''
 		if len(self.domains) ==  0:
 			self._get_whitelist()
 
