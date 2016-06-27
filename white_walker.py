@@ -1,10 +1,10 @@
 #!/usr/bin/python
 import socket
 import re
+import zipfile, StringIO
 import requests
 from pythreatgrid.threatgrid import get_analysis, search_samples
 import json
-from pprint import pprint
 
 class WhiteWalker():
 
@@ -15,26 +15,26 @@ class WhiteWalker():
  
 
 	def _get_whitelist(self):
-		''' Reads whitelist from domains.csv. If this fails, it fetches this list on GitHub.
+		''' Reads whitelist from domains.csv. If this fails, it fetches this list on Alexa.
 		Args:
 			None.
 		Updates:
 			Instance variable domains is set to a dictionary of ranking and domains from whitelist.
 		'''
 		try:	
-			fp = open("domains.csv","r")
+			fp = open("top-1m.csv","r")
 			lines = fp.readlines()
 			for line in lines:
 				pair = line.rstrip().split(',')
 				self.domains[pair[1]] = pair[0]
 		except:
 			print("\nFailed to open domains.csv...fetching from github...\n")
-			r = requests.get("https://raw.githubusercontent.com/ZackNagaich/white-walker/master/domains.csv")
-			data = r.text
-			fp = open("domains.csv","w")
-			fp.write(data)
-			fp.close()
+			r = requests.get("http://s3.amazonaws.com/alexa-static/top-1m.csv.zip",stream=True)
+			z = zipfile.ZipFile(StringIO.StringIO(r.content))
+			z.extractall()
 			
+			fp = open("top-1m.csv","r")
+			lines = fp.readlines()
 			lines = data.split('\n')[:-1]
 			for line in lines:
 				pair = line.rstrip().split(',')
